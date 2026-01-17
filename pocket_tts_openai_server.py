@@ -31,6 +31,29 @@ model = None
 voice_cache = {} # Cache for voice states
 VOICES_DIR = None
 
+# --- PyInstaller Support ---
+if getattr(sys, 'frozen', False):
+    # If the application is run as a bundle, the PyInstaller bootloader
+    # extends the sys module by a flag frozen=True.
+    if hasattr(sys, '_MEIPASS'):
+        # One-file mode
+        base_path = sys._MEIPASS
+    else:
+        # One-dir mode
+        base_path = os.path.dirname(os.path.abspath(sys.executable))
+        
+    template_folder = os.path.join(base_path, 'templates')
+    static_folder = os.path.join(base_path, 'static')
+    app = Flask(__name__, template_folder=template_folder, static_folder=static_folder)
+    
+    # Default Voices Dir when frozen (bundled)
+    # We will assume 'voices' is bundled into the root of the executable
+    BUNDLE_VOICES_DIR = os.path.join(base_path, 'voices')
+else:
+    app = Flask(__name__)
+    base_path = os.path.dirname(os.path.abspath(__file__))
+    BUNDLE_VOICES_DIR = None
+
 # --- Helpers ---
 
 def get_voice_state(voice_id_or_path):
@@ -235,7 +258,12 @@ def main():
     # Config
     app.config['CLI_STREAM_DEFAULT'] = args.stream
     global VOICES_DIR
-    VOICES_DIR = args.voices_dir
+    if args.voices_dir:
+        VOICES_DIR = args.voices_dir
+    elif getattr(sys, 'frozen', False) and BUNDLE_VOICES_DIR and os.path.isdir(BUNDLE_VOICES_DIR):
+        VOICES_DIR = BUNDLE_VOICES_DIR
+    else:
+        VOICES_DIR = None
     
     global model
     logger.info("Loading Pocket TTS Model...")
@@ -244,6 +272,21 @@ def main():
     if args.model_path:
         logger.info(f"Using custom model variant/path: {args.model_path}")
         model = TTSModel.load_model(variant=args.model_path)
+    elif getattr(sys, 'frozen', False):
+        # Check if model is bundled in 'model' dir
+        #bundled_model_dir = os.path.join(base_path, 'model')
+        #if os.path.isdir(bundled_model_dir):
+             #logger.info(f"Using bundled model from: {bundled_model_dir}")
+             # We assume the directory contains the necessary files and pass the directory path
+             # Depending on pocket-tts implementation, passing the dir might work if it looks for files inside
+             # However, load_model usually takes a variant name or a path to a specific file/dir?
+             # Let's assume passing the directory works if it contains the artifacts.
+             # Actually, looking at pocket-tts, usually one passes the safelytensors file or just the variant name.
+             # If we bundle it, we should find the .safetensors file?
+             # Usually load_model(variant=path) works. 
+             #model = TTSModel.load_model(variant=bundled_model_dir)
+        #else:
+        model = TTSModel.load_model()
     else:
         model = TTSModel.load_model()
         
