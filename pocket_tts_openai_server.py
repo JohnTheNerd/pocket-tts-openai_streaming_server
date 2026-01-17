@@ -135,10 +135,14 @@ def generate_speech():
         
     text = data.get('input')
     voice = data.get('voice', 'hf://kyutai/tts-voices/alba-mackenna/casual.wav')
-    response_format = data.get('response_format', 'wav')
     
     # Check stream flag
     stream_request = data.get('stream', False)
+    
+    if stream_request:
+        response_format = data.get('response_format', 'pcm')
+    else:
+        response_format = data.get('response_format', 'mp3')
 
     if not text:
         return jsonify({"error": "Missing 'input' text"}), 400
@@ -181,33 +185,36 @@ def generate_file(voice_state, text, fmt):
     )
 
 def stream_audio(voice_state, text, fmt):
-    """Stream audio chunks."""
+    """Stream audio chunks as WAV or raw PCM."""
     
     def generate():
+        # pocket-tts native streaming
         stream = model.generate_audio_stream(voice_state, text)
         
         for chunk_tensor in stream:
-            # Convert to int16 PCM bytes
-            # Ensure CPU/correct shape
-            if chunk_tensor.is_cuda: chunk_tensor = chunk_tensor.cpu()
-            if chunk_tensor.dim() == 1: chunk_tensor = chunk_tensor.unsqueeze(0)
+            if chunk_tensor.is_cuda: 
+                chunk_tensor = chunk_tensor.cpu()
+            if chunk_tensor.dim() == 1: 
+                chunk_tensor = chunk_tensor.unsqueeze(0)
             
-            # Simple PCM conversion
+            # Convert to 16-bit PCM
             c = (chunk_tensor * 32767).clamp(-32768, 32767).to(torch.int16)
-            data_bytes = c.numpy().tobytes()
-            yield data_bytes
+            yield c.numpy().tobytes()
 
     def stream_with_header():
-        # Valid WAV Header for streaming
+        # ONLY yield header if format is WAV
         if fmt == 'wav':
-             # We assume standard 24kHz mono based on model
-             # If model rate varies, we should use model.sample_rate
-             yield write_wav_header(model.sample_rate, num_channels=1, bits_per_sample=16, num_frames=0)
+            yield write_wav_header(model.sample_rate, num_channels=1, bits_per_sample=16, num_frames=0)
              
         yield from generate()
 
-    mimetype = f"audio/{fmt}"
-    if fmt == 'wav': mimetype = 'audio/wav'
+    # Match the MIME types from your reference script
+    if fmt == 'pcm':
+        mimetype = "audio/L16"
+    elif fmt == 'wav':
+        mimetype = "audio/wav"
+    else:
+        mimetype = f"audio/{fmt}"
     
     return Response(stream_with_context(stream_with_header()), mimetype=mimetype)
 

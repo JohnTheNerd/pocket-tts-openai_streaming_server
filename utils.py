@@ -45,7 +45,7 @@ def convert_audio(audio_tensor: torch.Tensor, sample_rate: int, target_format: s
 def validate_format(fmt: str) -> str:
     """Normalize and validate the requested audio format."""
     fmt = fmt.lower()
-    valid_formats = {'mp3', 'wav', 'opus', 'aac', 'flac'}
+    valid_formats = {'mp3', 'wav', 'opus', 'aac', 'flac', 'pcm'}
     
     if fmt == 'mpeg': # OpenAI sometimes sends 'mpeg' aka mp3
         return 'mp3'
