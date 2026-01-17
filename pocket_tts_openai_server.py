@@ -39,33 +39,35 @@ def get_voice_state(voice_id_or_path):
     """
     global voice_cache
     
-    # Check cache first
-    if voice_id_or_path in voice_cache:
-        # logger.info(f"Using cached voice state for {voice_id_or_path}")
-        return voice_cache[voice_id_or_path]
-    
-    # If path is relative to VOICES_DIR and exists there, resolve it
+    # 1. Normalize/Resolve the ID to its final path/form first
+    resolved_key = voice_id_or_path
     if VOICES_DIR:
         possible_path = os.path.join(VOICES_DIR, voice_id_or_path)
         if os.path.exists(possible_path):
-            voice_id_or_path = possible_path
+            resolved_key = os.path.abspath(possible_path) # Use absolute path for consistency
+    elif os.path.exists(voice_id_or_path):
+        resolved_key = os.path.abspath(voice_id_or_path)
 
-    # Check existence if local path
-    if os.path.exists(voice_id_or_path):
-        # It's a local file
-        logger.info(f"Loading new voice state from file: {voice_id_or_path}")
-        state = model.get_state_for_audio_prompt(voice_id_or_path)
-        voice_cache[voice_id_or_path] = state
-        return state
+    # 2. Check cache using the resolved key
+    if resolved_key in voice_cache:
+        logger.info(f"Using cached voice state for {resolved_key}")
+        return voice_cache[resolved_key]
     
-    # URL or ID
+    # 3. If not cached, load it
     try:
-        logger.info(f"Loading new voice state from ID/URL: {voice_id_or_path}")
-        state = model.get_state_for_audio_prompt(voice_id_or_path)
-        voice_cache[voice_id_or_path] = state
+        if os.path.exists(resolved_key):
+            logger.info(f"Loading new voice state from file: {resolved_key}")
+        else:
+            logger.info(f"Loading new voice state from ID/URL: {resolved_key}")
+            
+        state = model.get_state_for_audio_prompt(resolved_key)
+        
+        # 4. Store in cache using the same resolved key
+        voice_cache[resolved_key] = state
         return state
+        
     except Exception as e:
-        logger.error(f"Failed to load voice {voice_id_or_path}: {e}")
+        logger.error(f"Failed to load voice {resolved_key}: {e}")
         raise ValueError(f"Voice '{voice_id_or_path}' could not be loaded.")
 
 # --- Routes ---
@@ -208,7 +210,7 @@ def stream_audio(voice_state, text, fmt):
              
         yield from generate()
 
-    # Match the MIME types from your reference script
+    # Match the MIME types
     if fmt == 'pcm':
         mimetype = "audio/L16"
     elif fmt == 'wav':
