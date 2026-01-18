@@ -59,9 +59,10 @@ if "%INPUT_VOICES%"=="" (
 )
 
 :: 6. Streaming Default
-set "STREAM_ARG="
-set /p "INPUT_STREAM=Enable Streaming by default? (Y/N) [N]: "
-if /i "%INPUT_STREAM%"=="Y" set "STREAM_ARG=--stream"
+:: Changed: Defaults to ON. Only unsets if the user types 'N'.
+set "STREAM_ARG=--stream"
+set /p "INPUT_STREAM=Enable Streaming? (Y/N) [Y]: "
+if /i "%INPUT_STREAM%"=="N" set "STREAM_ARG="
 
 echo.
 echo ========================================================
