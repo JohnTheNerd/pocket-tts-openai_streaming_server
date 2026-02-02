@@ -43,6 +43,9 @@ class Config:
     # Streaming default
     STREAM_DEFAULT = os.environ.get('POCKET_TTS_STREAM_DEFAULT', 'true').lower() == 'true'
 
+    # Docker detection (check for /.dockerenv or cgroup)
+    IS_DOCKER = os.path.exists('/.dockerenv') or os.path.isfile('/proc/1/cgroup')
+
     # Logging
     LOG_LEVEL = os.environ.get('POCKET_TTS_LOG_LEVEL', 'INFO')
     LOG_DIR = os.environ.get('POCKET_TTS_LOG_DIR', str(BASE_PATH / 'logs'))

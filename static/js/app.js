@@ -45,10 +45,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 	await loadVoices();
 
-	// 2. Handle Voice Selection Change
+	// 2. Handle Voice Selection Change (hide custom option in Docker mode)
+	const isDocker = window.POCKET_TTS_CONFIG?.isDocker || false;
+
+	// Remove the "Custom" option when running in Docker (paths won't work)
+	if (isDocker) {
+		const customOption = voiceSelect.querySelector('option[value="custom"]');
+		if (customOption) customOption.remove();
+	}
+
 	voiceSelect.addEventListener('change', (e) => {
-		if (e.target.value === 'custom') {
-			// Setup for Custom Path
+		if (e.target.value === 'custom' && !isDocker) {
+			// Setup for Custom Path (only for native/exe mode)
 			document.querySelector('#custom-voice-group label').textContent =
 				'Absolute Path to Audio File:';
 			voiceFile.type = 'text';

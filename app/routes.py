@@ -33,7 +33,9 @@ api = Blueprint('api', __name__)
 @api.route('/')
 def home():
     """Serve the web interface."""
-    return render_template('index.html')
+    from app.config import Config
+
+    return render_template('index.html', is_docker=Config.IS_DOCKER)
 
 
 @api.route('/health', methods=['GET'])
