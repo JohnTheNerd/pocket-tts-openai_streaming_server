@@ -166,9 +166,19 @@ class TTSService:
 
         Returns:
             Resolved path or identifier
+
+        Raises:
+            ValueError: If unsafe URL scheme is used
         """
-        # Check if it's a URL or HF path - pass through
-        if voice_id_or_path.startswith(('http://', 'https://', 'hf://')):
+        # Block potentially dangerous URL schemes (SSRF protection)
+        if voice_id_or_path.startswith(('http://', 'https://')):
+            raise ValueError(
+                f"URL scheme not allowed for security reasons: {voice_id_or_path[:50]}. "
+                "Use 'hf://' for HuggingFace models or provide a local file path."
+            )
+
+        # Allow HuggingFace URLs
+        if voice_id_or_path.startswith('hf://'):
             return voice_id_or_path
 
         # Check if it's a built-in voice
@@ -206,15 +216,22 @@ class TTSService:
         Returns:
             Tuple of (is_valid, message)
         """
-        resolved = self._resolve_voice_path(voice_id_or_path)
+        # Block unsafe URL schemes first
+        if voice_id_or_path.startswith(('http://', 'https://')):
+            return False, 'HTTP/HTTPS URLs are not allowed for security reasons. Use hf:// for HuggingFace models.'
+
+        try:
+            resolved = self._resolve_voice_path(voice_id_or_path)
+        except ValueError as e:
+            return False, str(e)
 
         # Built-in voices are always valid
         if resolved.lower() in Config.BUILTIN_VOICES:
             return True, f'Built-in voice: {resolved}'
 
-        # URLs - assume valid (we can't check without making a request)
-        if resolved.startswith(('http://', 'https://', 'hf://')):
-            return True, f'Remote voice: {resolved}'
+        # HuggingFace URLs - assume valid
+        if resolved.startswith('hf://'):
+            return True, f'HuggingFace voice: {resolved}'
 
         # Local file - check existence
         if os.path.exists(resolved):

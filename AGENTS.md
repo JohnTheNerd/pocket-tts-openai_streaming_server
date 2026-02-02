@@ -65,11 +65,13 @@ server.py                    # Entry point, CLI, starts Waitress
 
 ## Voice Resolution Order
 
-1. URLs (`http://`, `https://`, `hf://`) → pass to pocket-tts
-2. Built-in names (`alba`, `marius`, etc.) → pass to pocket-tts
+1. Built-in names (`alba`, `marius`, etc.) → pass to pocket-tts
+2. HuggingFace models (`hf://` URLs) → pass to pocket-tts
 3. Files in `POCKET_TTS_VOICES_DIR`
 4. Absolute paths
 5. Fallback to pocket-tts
+
+**Security Note**: HTTP/HTTPS URLs are blocked to prevent SSRF attacks. Only `hf://` URLs are allowed for remote models.
 
 ## Development
 
