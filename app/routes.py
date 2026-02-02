@@ -168,6 +168,17 @@ def _generate_file(tts, voice_state, text: str, fmt: str):
 
 def _stream_audio(tts, voice_state, text: str, fmt: str):
     """Stream audio chunks."""
+    # Normalize streaming format: we always emit PCM bytes, optionally wrapped
+    # in a WAV container. For non-PCM/WAV formats (e.g. mp3, opus), coerce to
+    # raw PCM to avoid mismatched content-type vs. payload.
+    stream_fmt = fmt
+    if stream_fmt not in ('pcm', 'wav'):
+        logger.warning(
+            "Requested streaming format '%s' is not supported for streaming; "
+            "falling back to 'pcm'.",
+            stream_fmt,
+        )
+        stream_fmt = 'pcm'
 
     def generate():
         stream = tts.generate_audio_stream(voice_state, text)
@@ -175,11 +186,11 @@ def _stream_audio(tts, voice_state, text: str, fmt: str):
             yield tensor_to_pcm_bytes(chunk_tensor)
 
     def stream_with_header():
-        # Yield WAV header first if format is WAV
-        if fmt == 'wav':
+        # Yield WAV header first if streaming as WAV
+        if stream_fmt == 'wav':
             yield write_wav_header(tts.sample_rate, num_channels=1, bits_per_sample=16)
         yield from generate()
 
-    mimetype = get_mime_type(fmt)
+    mimetype = get_mime_type(stream_fmt)
 
     return Response(stream_with_context(stream_with_header()), mimetype=mimetype)
