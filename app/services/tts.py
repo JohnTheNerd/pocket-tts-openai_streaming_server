@@ -11,6 +11,9 @@ import torch
 
 from app.config import Config
 from app.logging_config import get_logger
+import safetensors
+
+from pocket_tts.modules.stateful_module import init_states
 
 logger = get_logger('tts')
 
@@ -147,6 +150,26 @@ class TTSService:
         t0 = time.time()
 
         try:
+            # Check if it's a safetensors file
+            if os.path.exists(resolved_key) and os.path.isfile(resolved_key):
+                file_ext = os.path.splitext(resolved_key)[1].lower()
+                if file_ext == ".safetensors":
+                    logger.info(f"Loading pre-exported voice embedding from safetensors: {resolved_key}")
+                    prompt = safetensors.torch.load_file(resolved_key)["audio_prompt"]
+                    prompt = prompt.to(self.model.device)
+                    logger.debug(f"Loaded audio prompt from safetensors, shape: {prompt.shape}")
+                    
+                    # Manually initialize state and prompt
+                    model_state = init_states(self.model.flow_lm, batch_size=1, sequence_length=1000)
+                    with torch.no_grad():
+                        self.model._run_flow_lm_and_increment_step(model_state=model_state, audio_conditioning=prompt)
+                    
+                    self.voice_cache[resolved_key] = model_state
+                    load_time = time.time() - t0
+                    logger.info(f'Voice loaded in {load_time:.2f}s: {resolved_key}')
+                    return model_state
+            
+            # Standard audio file
             state = self.model.get_state_for_audio_prompt(resolved_key)
             self.voice_cache[resolved_key] = state
             load_time = time.time() - t0
